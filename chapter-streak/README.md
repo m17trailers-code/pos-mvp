@@ -38,6 +38,27 @@ total. A perfect passage is marked with a star on the path.
 All state lives in `localStorage` under `chapter-streak/v1` — nothing is
 uploaded, and books stay on the device that imported them.
 
+## The cast
+
+Four original characters, drawn as inline SVG so they animate, scale and
+re-theme with the palette. They are not decoration — each one owns a moment:
+
+| Who | What they are | When they appear |
+| --- | --- | --- |
+| **Wick** | A stub of candle | Greets you on the shelf with your streak, stands beside the live node, confirms right answers, fronts the results card |
+| **Nib** | A quill pen | Sets every question |
+| **Marge** | A bookworm | Reads alongside you during the passage |
+| **Blot** | A spill of ink | Turns up on wrong answers and when you run out of hearts, and blames himself |
+
+Lines are pooled per moment and never repeat twice in a row. Blot's excuses
+differ for a missing word and a scrambled order.
+
+Idle motion (breathing, blinking, a flickering flame), reactions (cheer,
+wobble, peek), speech-bubble pops, staggered shelf and path entrances, a stamp
+on the node you just earned, counting-up XP, and short WebAudio blips — no
+audio files — with a mute toggle in the header. Everything respects
+`prefers-reduced-motion`.
+
 ## Content
 
 The bundled sample story, *The Lamplighter's Almanac*, is original writing
