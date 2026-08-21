@@ -1,0 +1,998 @@
+<title>Chapter Streak</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Literata:ital,opsz,wght@0,7..72,400..600;1,7..72,400&family=Space+Mono:wght@400;700&display=swap">
+<style>
+/* ---------- tokens: riso chapbook, two inks on newsprint ---------- */
+:root{
+  --paper:#EFF0EA; --sunk:#E3E5DC; --card:#FBFBF7;
+  --ink:#17322C; --ink-soft:#52685F; --ink-faint:#8E9C94;
+  --red:#E4483A; --red-ink:#FFF4F2;
+  --blue:#2F4DD0; --blue-ink:#F2F4FF;
+  --yellow:#D9930C;
+  --line:#CDD3C7; --line-hard:#B4BDAC;
+  --grain:.055; --blend:multiply;
+  --r:14px;
+  --f-display:"Bricolage Grotesque",-apple-system,"Segoe UI",sans-serif;
+  --f-read:"Literata",Georgia,"Times New Roman",serif;
+  --f-mono:"Space Mono",ui-monospace,"SFMono-Regular",monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --paper:#101E1A; --sunk:#0A1512; --card:#17281F;
+    --ink:#E8EAE0; --ink-soft:#A2B3AA; --ink-faint:#71847B;
+    --red:#FF6A59; --red-ink:#2A100C;
+    --blue:#8FA0FF; --blue-ink:#111634;
+    --yellow:#F2BE4E;
+    --line:#283D34; --line-hard:#385046;
+    --grain:.07; --blend:screen;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#101E1A; --sunk:#0A1512; --card:#17281F;
+  --ink:#E8EAE0; --ink-soft:#A2B3AA; --ink-faint:#71847B;
+  --red:#FF6A59; --red-ink:#2A100C;
+  --blue:#8FA0FF; --blue-ink:#111634;
+  --yellow:#F2BE4E;
+  --line:#283D34; --line-hard:#385046;
+  --grain:.07; --blend:screen;
+}
+
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0; background:var(--paper); color:var(--ink);
+  font-family:var(--f-display); font-weight:500;
+  -webkit-font-smoothing:antialiased; overflow-x:hidden;
+}
+/* newsprint grain */
+body::after{
+  content:""; position:fixed; inset:0; pointer-events:none; z-index:99; opacity:var(--grain);
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+:focus-visible{outline:2.5px solid var(--blue); outline-offset:2px; border-radius:4px}
+h1,h2,h3{text-wrap:balance;margin:0}
+
+.shell{max-width:520px;margin:0 auto;min-height:100%;display:flex;flex-direction:column;position:relative}
+
+/* ---------- chunky press buttons (offset ink block) ---------- */
+.btn{
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  width:100%;padding:15px 18px;border-radius:var(--r);
+  background:var(--red);color:#fff;border:2px solid var(--ink);
+  box-shadow:0 4px 0 var(--ink); font-weight:800; letter-spacing:.02em;
+  text-transform:uppercase; font-size:.95rem;
+  transition:transform .06s ease, box-shadow .06s ease;
+}
+.btn:active:not(:disabled){transform:translateY(4px);box-shadow:0 0 0 var(--ink)}
+.btn:disabled{background:var(--sunk);color:var(--ink-faint);border-color:var(--line-hard);box-shadow:0 4px 0 var(--line-hard);cursor:not-allowed}
+.btn.ghost{background:var(--card);color:var(--ink)}
+.btn.blue{background:var(--blue)}
+.btn.sm{padding:10px 14px;font-size:.8rem;box-shadow:0 3px 0 var(--ink)}
+
+.label{font-family:var(--f-mono);font-size:.68rem;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-faint)}
+.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-weight:700}
+
+/* ---------- top HUD ---------- */
+.hud{
+  position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:14px;
+  padding:12px 18px;background:var(--paper);border-bottom:2px solid var(--ink);
+}
+.hud .stat{display:flex;align-items:center;gap:6px;font-size:.95rem;font-weight:800}
+.hud .stat svg{width:20px;height:20px;display:block}
+.streak-n{color:var(--yellow)} .hearts-n{color:var(--red)} .xp-n{color:var(--blue)}
+.hud .spacer{flex:1}
+.ring{width:34px;height:34px;transform:rotate(-90deg)}
+.ring circle{fill:none;stroke-width:5;stroke-linecap:round}
+.ring .bg{stroke:var(--line)} .ring .fg{stroke:var(--blue);transition:stroke-dashoffset .6s ease}
+.goalwrap{position:relative;display:grid;place-items:center}
+.goalwrap b{position:absolute;font-family:var(--f-mono);font-size:.55rem}
+
+/* ---------- library ---------- */
+.pad{padding:22px 18px 40px}
+.wordmark{position:relative;display:inline-block;font-size:2rem;font-weight:800;letter-spacing:-.02em;line-height:1}
+.wordmark::before{content:attr(data-text);position:absolute;left:-2px;top:1px;color:var(--red);opacity:.9;mix-blend-mode:var(--blend);z-index:-1}
+.tagline{color:var(--ink-soft);font-size:.9rem;margin:10px 0 0;max-width:34ch;line-height:1.45}
+
+.stats-strip{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:22px 0}
+.tile{background:var(--card);border:2px solid var(--ink);border-radius:var(--r);padding:12px;box-shadow:0 3px 0 var(--line-hard)}
+.tile .v{font-family:var(--f-mono);font-size:1.4rem;font-weight:700;line-height:1.1}
+.tile .k{font-family:var(--f-mono);font-size:.6rem;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-faint);margin-top:4px}
+
+.sec-head{display:flex;align-items:baseline;gap:10px;margin:26px 0 12px}
+.sec-head h2{font-size:1.05rem;font-weight:800;letter-spacing:-.01em}
+.rule{flex:1;height:2px;background:var(--line);border-radius:2px}
+
+.book{
+  display:flex;gap:14px;align-items:center;width:100%;text-align:left;
+  background:var(--card);border:2px solid var(--ink);border-radius:var(--r);
+  padding:12px;box-shadow:0 4px 0 var(--line-hard);margin-bottom:12px;
+  transition:transform .08s ease,box-shadow .08s ease;
+}
+.book:active{transform:translateY(3px);box-shadow:0 1px 0 var(--line-hard)}
+.spine{width:46px;height:64px;border-radius:4px;flex:none;border:2px solid var(--ink);position:relative;overflow:hidden}
+.spine::after{content:"";position:absolute;inset:0 0 0 8px;border-left:2px dashed rgba(0,0,0,.28)}
+.book .t{display:block;font-weight:800;font-size:1rem;line-height:1.25}
+.book .a{display:block;color:var(--ink-soft);font-size:.82rem;margin-top:2px}
+.book .m{display:block;font-family:var(--f-mono);font-size:.65rem;color:var(--ink-faint);margin-top:7px;letter-spacing:.06em}
+.bar{display:block;height:8px;background:var(--sunk);border:1.5px solid var(--ink);border-radius:99px;overflow:hidden;margin-top:7px}
+.bar i{display:block;height:100%;background:var(--red);border-radius:99px;transition:width .5s ease}
+.kill{flex:none;align-self:flex-start;color:var(--ink-faint);font-size:1.1rem;line-height:1;padding:4px 6px}
+
+/* ---------- the path ---------- */
+.pathwrap{position:relative;padding:8px 0 60px}
+#thread{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0}
+#thread path{fill:none;stroke:var(--line-hard);stroke-width:4;stroke-linecap:round;stroke-dasharray:2 14}
+.unit{display:flex;align-items:center;gap:12px;margin:26px 18px 18px;position:relative;z-index:1}
+.unit .tag{font-family:var(--f-mono);font-size:.62rem;letter-spacing:.14em;text-transform:uppercase;background:var(--ink);color:var(--paper);padding:5px 9px;border-radius:99px;white-space:nowrap}
+.row{display:flex;justify-content:center;position:relative;z-index:1;margin:14px 0}
+.unit + .row{margin-top:46px}
+.node{
+  width:74px;height:74px;border-radius:50%;position:relative;
+  background:var(--sunk);border:3px solid var(--line-hard);
+  display:grid;place-items:center;color:var(--ink-faint);
+  box-shadow:0 5px 0 var(--line-hard);
+  transition:transform .08s ease,box-shadow .08s ease;
+}
+.node .n{font-family:var(--f-mono);font-weight:700;font-size:1.05rem}
+.node svg{width:30px;height:30px}
+.node.open{background:var(--red);border-color:var(--ink);color:#fff;box-shadow:0 5px 0 var(--ink)}
+.node.done{background:var(--card);border-color:var(--ink);color:var(--ink);box-shadow:0 5px 0 var(--ink)}
+.node.done.perfect{background:var(--blue);color:#fff}
+.node:not(:disabled):active{transform:translateY(4px);box-shadow:0 1px 0 var(--ink)}
+.node.open::after{
+  content:"";position:absolute;inset:-9px;border-radius:50%;border:3px solid var(--red);
+  animation:ping 2.1s cubic-bezier(.2,.7,.3,1) infinite;
+}
+@keyframes ping{0%{transform:scale(.92);opacity:.85}70%,100%{transform:scale(1.22);opacity:0}}
+.flag{
+  position:absolute;bottom:calc(100% + 14px);left:50%;transform:translateX(-50%);
+  font-family:var(--f-mono);font-size:.62rem;letter-spacing:.14em;text-transform:uppercase;
+  background:var(--card);border:2px solid var(--ink);color:var(--ink);
+  padding:6px 10px;border-radius:8px;box-shadow:0 3px 0 var(--ink);white-space:nowrap;
+  animation:bob 1.8s ease-in-out infinite;
+}
+.flag::after{content:"";position:absolute;top:100%;left:50%;margin-left:-6px;border:6px solid transparent;border-top-color:var(--ink)}
+@keyframes bob{0%,100%{transform:translate(-50%,0)}50%{transform:translate(-50%,-5px)}}
+
+.topbar{display:flex;align-items:center;gap:12px;padding:12px 18px;border-bottom:2px solid var(--ink);background:var(--paper);position:sticky;top:0;z-index:20}
+.topbar h2{font-size:1rem;font-weight:800;line-height:1.2;flex:1;min-width:0}
+.topbar h2 small{display:block;font-weight:500;font-size:.72rem;color:var(--ink-soft);font-family:var(--f-mono);letter-spacing:.06em;margin-top:2px}
+.icon-btn{width:36px;height:36px;flex:none;display:grid;place-items:center;border:2px solid var(--ink);border-radius:10px;background:var(--card);box-shadow:0 3px 0 var(--ink)}
+.icon-btn:active{transform:translateY(3px);box-shadow:none}
+.icon-btn svg{width:18px;height:18px}
+
+/* ---------- lesson overlay ---------- */
+.sheet{position:fixed;inset:0;z-index:60;background:var(--paper);display:none;flex-direction:column}
+.sheet.on{display:flex}
+.sheet-in{max-width:520px;margin:0 auto;width:100%;flex:1;display:flex;flex-direction:column;min-height:0}
+.lhead{display:flex;align-items:center;gap:12px;padding:14px 18px}
+.prog{flex:1;height:14px;background:var(--sunk);border:2px solid var(--ink);border-radius:99px;overflow:hidden}
+.prog i{display:block;height:100%;background:var(--blue);transition:width .35s ease}
+.scroll{flex:1;overflow-y:auto;padding:6px 18px 26px;min-height:0;display:flex;flex-direction:column}
+
+.passage{font-family:var(--f-read);font-size:var(--rs,1.075rem);line-height:1.72;color:var(--ink)}
+.passage p{margin:0 0 1.15em}
+.passage p:first-of-type::first-letter{
+  float:left;font-family:var(--f-display);font-weight:800;font-size:3.1em;line-height:.82;
+  padding:.06em .1em 0 0;color:var(--red);
+}
+.reading-tools{display:flex;align-items:center;gap:8px;margin:0 0 18px}
+.tool{width:32px;height:32px;border:2px solid var(--line-hard);border-radius:8px;display:grid;place-items:center;font-weight:800;color:var(--ink-soft);background:var(--card)}
+
+.q{font-size:1.1rem;font-weight:800;line-height:1.4;margin:8px 0 18px}
+.q .blank{display:inline-block;min-width:88px;border-bottom:3px solid var(--red);vertical-align:-2px}
+.q em{font-family:var(--f-read);font-style:italic;font-weight:400}
+.opts{display:flex;flex-direction:column;gap:10px}
+.opt{
+  text-align:left;padding:14px 16px;border:2px solid var(--line-hard);border-radius:var(--r);
+  background:var(--card);box-shadow:0 3px 0 var(--line-hard);font-weight:600;font-size:1rem;
+  transition:transform .06s ease,box-shadow .06s ease;
+}
+.opt:active{transform:translateY(3px);box-shadow:none}
+.opt.sel{border-color:var(--blue);box-shadow:0 3px 0 var(--blue);background:var(--blue-ink);color:var(--ink)}
+.opt.right{border-color:var(--blue);background:var(--blue);color:#fff;box-shadow:0 3px 0 var(--ink)}
+.opt.wrong{border-color:var(--red);background:var(--red-ink);color:var(--ink);box-shadow:0 3px 0 var(--red)}
+.opt:disabled{cursor:default}
+
+.slots{display:flex;flex-direction:column;gap:8px;margin-bottom:18px}
+.slot{min-height:52px;border:2px dashed var(--line-hard);border-radius:var(--r);display:flex;align-items:center;padding:8px 12px;gap:10px;background:var(--sunk)}
+.slot .i{font-family:var(--f-mono);font-size:.7rem;color:var(--ink-faint);flex:none}
+.chip{
+  font-family:var(--f-read);font-size:.92rem;line-height:1.4;text-align:left;
+  border:2px solid var(--line-hard);background:var(--card);border-radius:10px;padding:9px 12px;
+  box-shadow:0 3px 0 var(--line-hard);
+}
+.chip.in{box-shadow:none;border-style:solid;border-color:var(--ink);flex:1}
+.pool{display:flex;flex-direction:column;gap:9px}
+
+.footer{border-top:2px solid var(--ink);padding:14px 18px calc(14px + env(safe-area-inset-bottom));background:var(--card)}
+.footer.correct{background:var(--blue);border-color:var(--ink)}
+.footer.miss{background:var(--sunk)}
+.verdict{display:flex;align-items:center;gap:10px;margin-bottom:12px;font-weight:800}
+.footer.correct .verdict{color:#fff}
+.verdict .sub{display:block;font-weight:500;font-size:.82rem;font-family:var(--f-read);opacity:.9;margin-top:3px}
+.footer.correct .btn{background:var(--card);color:var(--ink)}
+
+/* ---------- results / modal ---------- */
+.center{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px 18px;gap:6px}
+.center h2{font-size:1.9rem;font-weight:800;letter-spacing:-.02em}
+.awards{display:grid;grid-template-columns:1fr 1fr;gap:12px;width:100%;max-width:340px;margin:22px 0 8px}
+.award{border:2px solid var(--ink);border-radius:var(--r);padding:2px;box-shadow:0 4px 0 var(--ink)}
+.award .in{border-radius:10px;padding:11px 8px;background:var(--card)}
+.award .k{font-family:var(--f-mono);font-size:.58rem;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-faint)}
+.award .v{font-family:var(--f-mono);font-size:1.35rem;font-weight:700;margin-top:3px}
+.award.xp{border-color:var(--blue);box-shadow:0 4px 0 var(--blue)} .award.xp .v{color:var(--blue)}
+.award.st{border-color:var(--yellow);box-shadow:0 4px 0 var(--yellow)} .award.st .v{color:var(--yellow)}
+#burst{position:fixed;inset:0;pointer-events:none;z-index:70;display:none}
+
+.modal{position:fixed;inset:0;z-index:80;background:rgba(10,20,17,.55);display:none;align-items:flex-end;justify-content:center;padding:16px}
+.modal.on{display:flex}
+.modal .box{background:var(--card);border:2px solid var(--ink);border-radius:20px;box-shadow:0 6px 0 var(--ink);padding:22px 18px;width:100%;max-width:488px}
+.modal h3{font-size:1.25rem;font-weight:800;margin-bottom:8px}
+.modal p{color:var(--ink-soft);font-size:.92rem;line-height:1.5;margin:0 0 18px;font-family:var(--f-read)}
+.stack{display:flex;flex-direction:column;gap:10px}
+textarea,input[type=text]{
+  width:100%;font-family:var(--f-read);font-size:.95rem;color:var(--ink);background:var(--paper);
+  border:2px solid var(--line-hard);border-radius:12px;padding:11px 13px;margin-bottom:10px;
+}
+textarea{min-height:170px;resize:vertical;line-height:1.55}
+input[type=text]::placeholder,textarea::placeholder{color:var(--ink-faint)}
+.hint{font-family:var(--f-mono);font-size:.66rem;color:var(--ink-faint);line-height:1.6;letter-spacing:.03em}
+.file{display:block;border:2px dashed var(--line-hard);border-radius:12px;padding:13px;text-align:center;font-family:var(--f-mono);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:12px}
+.file input{display:none}
+.empty{text-align:center;padding:34px 18px;border:2px dashed var(--line-hard);border-radius:var(--r);color:var(--ink-soft);font-family:var(--f-read);line-height:1.6}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<canvas id="burst"></canvas>
+
+<div class="shell">
+  <header class="hud">
+    <span class="stat" title="Day streak">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" style="color:var(--yellow)">
+        <path d="M12 2s5 4.5 5 9a5 5 0 0 1-10 0c0-1.6.6-3 1.4-4.2C9 9.7 10 11 11 11c1.6 0 1-4.4 1-9Z"/>
+        <path d="M7 13a5 5 0 0 0 10 0v.5a5 5 0 0 1-10 0Z"/>
+      </svg>
+      <span class="num streak-n" id="hud-streak">0</span>
+    </span>
+    <span class="stat" title="Hearts">
+      <svg viewBox="0 0 24 24" fill="currentColor" style="color:var(--red)">
+        <path d="M12 20.5S3.5 15 3.5 9.2A4.7 4.7 0 0 1 12 6.4a4.7 4.7 0 0 1 8.5 2.8c0 5.8-8.5 11.3-8.5 11.3Z"/>
+      </svg>
+      <span class="num hearts-n" id="hud-hearts">5</span>
+    </span>
+    <span class="stat" title="Total XP">
+      <svg viewBox="0 0 24 24" fill="currentColor" style="color:var(--blue)">
+        <path d="M12 2.6l2.6 6.1 6.6.5-5 4.3 1.5 6.4L12 16.5 6.3 19.9l1.5-6.4-5-4.3 6.6-.5L12 2.6Z"/>
+      </svg>
+      <span class="num xp-n" id="hud-xp">0</span>
+    </span>
+    <span class="spacer"></span>
+    <span class="goalwrap" id="goal-ring" title="Daily goal">
+      <svg class="ring" viewBox="0 0 40 40"><circle class="bg" cx="20" cy="20" r="15"/><circle class="fg" id="ring-fg" cx="20" cy="20" r="15" stroke-dasharray="94.2" stroke-dashoffset="94.2"/></svg>
+      <b id="ring-txt">0%</b>
+    </span>
+  </header>
+
+  <!-- ============ LIBRARY ============ -->
+  <main id="view-library">
+    <div class="pad">
+      <h1 class="wordmark" data-text="Chapter Streak">Chapter Streak</h1>
+      <p class="tagline">Read one passage a day, prove you took it in, keep the streak alive.</p>
+
+      <div class="stats-strip">
+        <div class="tile"><div class="v num" id="s-words">0</div><div class="k">Words read</div></div>
+        <div class="tile"><div class="v num" id="s-lessons">0</div><div class="k">Passages</div></div>
+        <div class="tile"><div class="v num" id="s-acc">—</div><div class="k">Accuracy</div></div>
+      </div>
+
+      <div class="sec-head"><h2>Your shelf</h2><span class="rule"></span></div>
+      <div id="shelf"></div>
+      <button class="btn" id="btn-add" style="margin-top:6px">+ Add a book</button>
+      <p class="hint" style="margin-top:14px">Paste any plain text, or drop in a <b>.txt</b> file — a Project&nbsp;Gutenberg download works as-is. Chapter Streak slices it into passages and builds the exercises itself. Everything stays in this browser.</p>
+    </div>
+  </main>
+
+  <!-- ============ PATH ============ -->
+  <main id="view-path" hidden>
+    <div class="topbar">
+      <button class="icon-btn" id="btn-back" aria-label="Back to shelf">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
+      </button>
+      <h2 id="path-title">Book<small id="path-sub"></small></h2>
+    </div>
+    <div class="pathwrap" id="pathwrap"><svg id="thread" aria-hidden="true"><path id="thread-p"/></svg><div id="path-nodes"></div></div>
+  </main>
+</div>
+
+<!-- ============ LESSON ============ -->
+<div class="sheet" id="sheet">
+  <div class="sheet-in">
+    <div class="lhead">
+      <button class="icon-btn" id="btn-quit" aria-label="Leave passage">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+      <div class="prog"><i id="lesson-prog" style="width:0%"></i></div>
+      <span class="stat"><svg viewBox="0 0 24 24" fill="currentColor" style="color:var(--red);width:20px"><path d="M12 20.5S3.5 15 3.5 9.2A4.7 4.7 0 0 1 12 6.4a4.7 4.7 0 0 1 8.5 2.8c0 5.8-8.5 11.3-8.5 11.3Z"/></svg><span class="num hearts-n" id="lesson-hearts">5</span></span>
+    </div>
+    <div class="scroll" id="stage"></div>
+    <div class="footer" id="footer"></div>
+  </div>
+</div>
+
+<!-- ============ MODAL ============ -->
+<div class="modal" id="modal"><div class="box" id="modal-box"></div></div>
+
+<script>
+/* ============================================================
+   Chapter Streak — a reading habit engine.
+   Any plain text becomes a path of passages; each passage is
+   graded with exercises derived from the text itself, so no
+   authoring is needed for a book you bring yourself.
+   ============================================================ */
+
+/* Sample text below is original writing, included so the app
+   ships with something real to read. */
+const SAMPLE = {
+  title:"The Lamplighter's Almanac",
+  author:"Sample story",
+  hue:18,
+  text:`Ilsa Verrow lit forty-one lamps every evening, and forty of them remembered.
+
+That was the ordinary magic of Cold Harbour Street, and nobody there thought it remarkable, in the way that nobody thinks the tide remarkable for coming in twice. A lamp on Cold Harbour held whatever had been read aloud beneath it. Stand under the second lamp on a wet night and you could hear a fragment of a sea chart being recited by a man forty years dead. Stand under the ninth and you got recipes, mostly, and an argument about salt.
+
+Her father had kept the almanac before her, and his mother before him. It was not a book of dates. It was a ledger of which lamp held which story, written in a cramped hand that ran uphill toward the right margin as though the words themselves were climbing out. Lamp four: ghost stories, unreliable in summer. Lamp seventeen: legal documents, avoid. Lamp thirty: the good one, the one children were sent to when they were sick and could not sleep.
+
+The rule of the lamps was simple and her father had made her repeat it until it bored her. A lamp gives back only what someone first gave it. You cannot take a story out of a lamp that never had one put in. There is no borrowing in this town, he said, only lending, and the lending has to come first.
+
+The winter Ilsa turned nineteen, Cold Harbour went quiet. It happened the way most quiet happens, which is to say gradually and then all at once. The cannery closed. Families left for the inland towns where there was work. Those who stayed grew careful with their evenings, and reading aloud began to feel like a thing for people with time to waste. The lamps still gave back what they held, but fewer and fewer people stood beneath them to listen, and a story nobody listens to is only a light with a rumour inside it.
+
+At the end of the street, past the turn where the cobbles gave up and became mud, stood lamp forty-one. It was newer than the rest by a century. It had been raised after a storm took the old one, and in all the years since, no one had ever read a single line beneath it. Ilsa lit it every night out of duty. It burned perfectly well and it held nothing at all, and standing under it was like standing in a room where a conversation had just stopped.
+
+She began reading to it that January, out of stubbornness more than hope. She brought the almanac and read the entries aloud, which felt foolish, a ledger being read to a lamp. She brought tide tables. She brought a novel she disliked, on the theory that the lamp could not be choosy. Every night she read for a quarter of an hour into the cold, and every night the lamp gave back exactly nothing, and the silence under it seemed to grow more particular, more like an answer she was failing to earn.
+
+Her father would have told her what was wrong, if she had asked him while she still could. She worked it out herself on a night in March when her hands were too cold to hold the almanac open. She had been giving the lamp other people's words. Charts and tables and a novel she disliked. Nothing she had made, nothing that cost her anything to say. There is no borrowing, only lending, and she had never once lent it anything of her own.
+
+So she put the book down and told the lamp about her mother, who had died when Ilsa was six and whom she remembered mostly as a pair of hands braiding rope. She told it about the cannery whistle and how the town had felt smaller since it stopped. She told it she was frightened of being the last lamplighter, of the almanac ending in her handwriting with nothing after it. She talked until the cold got into her jaw and she had to stop.
+
+The lamp held it. She knew before she reached the corner, because the quality of the quiet behind her had changed, the way a house feels different when someone has come home. She turned around and walked back and stood under lamp forty-one, and heard her own voice come back to her, steadier than she had managed at the time, saying that she was frightened.
+
+It became known, as things do in a small place. People came at first to see whether it was true and then came back for other reasons. A fisherman read a letter he had never sent. A schoolteacher read out the names of every pupil she had taught in thirty-one years, which took most of an evening and drew a crowd by the end of it. The lamp took all of it and gave it back to whoever stood there and listened.
+
+Ilsa added the entry herself, in a hand that ran uphill toward the right margin, exactly as her father's had. Lamp forty-one, she wrote. Ours.`
+};
+
+/* ---------------- utilities ---------------- */
+const $ = s => document.querySelector(s);
+const clamp = (n,a,b) => Math.max(a, Math.min(b, n));
+function el(tag, cls, html){ const n=document.createElement(tag); if(cls)n.className=cls; if(html!=null)n.innerHTML=html; return n; }
+function esc(s){ return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function hash(str){ let h=2166136261; for(let i=0;i<str.length;i++){ h^=str.charCodeAt(i); h=Math.imul(h,16777619);} return h>>>0; }
+function mulberry32(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+function shuffle(arr, rnd){ const a=arr.slice(); for(let i=a.length-1;i>0;i--){ const j=Math.floor(rnd()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+function dayKey(d){ d=d||new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function daysBetween(a,b){ return Math.round((new Date(b+'T00:00') - new Date(a+'T00:00'))/86400000); }
+function wordsIn(s){ return s.match(/[A-Za-z][A-Za-z'-]*/g) || []; }
+function fmt(n){ return n>=10000 ? (n/1000).toFixed(n>=100000?0:1)+'k' : String(n); }
+
+const STOP = new Set(('the of and a to in is was that it for on with as his her he she at by they i you we but not from this had have has been were are be or an all their there which one would could should when what who them then him our your its into out up down over under again more most other some such no nor only own same so than too very can will just don now about after before because being between both did does doing during each few further here how if myself off once she said says say upon shall may must might made make well much many great little like long men man old part place right come came went give given took take thing things time times way years year').split(' '));
+
+/* Abbreviation periods are parked on a sentinel so they do not read as sentence ends. */
+const DOT = String.fromCharCode(1);
+const ABBR = ['Mr','Mrs','Ms','Dr','Prof','St','Sr','Jr','vs','etc','Inc','Ltd','Co','Capt','Gen','Col','Sgt','Rev','Hon','Mt','No','Fig','Vol'];
+function splitSentences(para){
+  let t = para;
+  ABBR.forEach(a => { t = t.split(a + '.').join(a + DOT); });
+  t = t.replace(/\b([A-Z])\./g, '$1' + DOT);
+  const parts = t.split(/(?<=[.!?][")\]]*)\s+(?=["(\[]?[A-Z0-9])/);
+  return parts.map(s => s.split(DOT).join('.').trim()).filter(s => s.length > 1);
+}
+
+/* ---------------- state ---------------- */
+const KEY = 'chapter-streak/v1';
+const FRESH = { books:{}, order:[], prog:{}, xp:0, streak:0, lastDay:null, dayXp:0, dayKey:null,
+                hearts:5, heartsDay:null, goal:30, words:0, lessonsDone:0, correct:0, attempts:0, rs:1.075, seeded:false };
+let S = load();
+
+function load(){
+  try{ const raw = localStorage.getItem(KEY); if(raw) return Object.assign(JSON.parse(JSON.stringify(FRESH)), JSON.parse(raw)); }
+  catch(e){ /* private mode, blocked storage, or corrupt json - start clean */ }
+  return JSON.parse(JSON.stringify(FRESH));
+}
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); return true; }catch(e){ return false; } }
+
+function rollDay(){
+  const today = dayKey();
+  if(S.heartsDay !== today){ S.hearts = 5; S.heartsDay = today; }
+  if(S.dayKey !== today){ S.dayXp = 0; S.dayKey = today; }
+  if(S.lastDay && daysBetween(S.lastDay, today) > 1) S.streak = 0;
+  save();
+}
+
+/* ---------------- turning raw text into a course ---------------- */
+function stripBoilerplate(t){
+  const start = t.match(/\*\*\*\s*START OF (THE|THIS) PROJECT GUTENBERG[^*]*\*\*\*/i);
+  if(start) t = t.slice(start.index + start[0].length);
+  const end = t.match(/\*\*\*\s*END OF (THE|THIS) PROJECT GUTENBERG[^*]*\*\*\*/i);
+  if(end) t = t.slice(0, end.index);
+  return t;
+}
+const TARGET = 110;
+function buildLessons(text){
+  const paras = stripBoilerplate(text)
+    .replace(/\r\n?/g, '\n')
+    .split(/\n\s*\n+/).map(p => p.replace(/\s*\n\s*/g, ' ').trim()).filter(p => p.length > 1);
+
+  const flat = [];
+  paras.forEach(p => { const ss = splitSentences(p); ss.forEach((s,i) => flat.push({ s, br: i === ss.length-1 })); });
+
+  const lessons = []; let cur = []; let n = 0;
+  const close = () => { if(!cur.length) return; lessons.push({ p: toParas(cur) }); cur = []; n = 0; };
+  for(const item of flat){
+    cur.push(item); n += wordsIn(item.s).length;
+    if(n >= TARGET || (item.br && n >= TARGET * 0.6)) close();
+  }
+  if(n >= 25 || !lessons.length) close();
+  else if(cur.length){ const last = lessons[lessons.length-1]; last.p = last.p.concat(toParas(cur)); }
+  return lessons;
+}
+function toParas(items){
+  const out = []; let buf = [];
+  items.forEach(it => { buf.push(it.s); if(it.br){ out.push(buf.join(' ')); buf = []; } });
+  if(buf.length) out.push(buf.join(' '));
+  return out;
+}
+function lessonSentences(book, i){ return book.lessons[i].p.flatMap(splitSentences); }
+function lessonWords(book, i){ return book.lessons[i].p.reduce((a,p) => a + wordsIn(p).length, 0); }
+
+/* ---------------- exercises derived from the passage itself ---------------- */
+function distractorPool(book, idx){
+  const pool = new Set();
+  for(let i = Math.max(0, idx-3); i < Math.min(book.lessons.length, idx+4); i++){
+    lessonSentences(book, i).forEach(s => wordsIn(s).forEach(w => {
+      if(w.length >= 5 && !STOP.has(w.toLowerCase())) pool.add(w.toLowerCase());
+    }));
+  }
+  return [...pool];
+}
+function matchCase(model, w){ return /^[A-Z]/.test(model) ? w.charAt(0).toUpperCase() + w.slice(1) : w; }
+
+function clozeFrom(sent, rnd, pool, used){
+  const ws = wordsIn(sent);
+  if(ws.length < 7 || ws.length > 42) return null;
+  const cands = ws.filter(w => w.length >= 5 && !STOP.has(w.toLowerCase()) && !used.has(w.toLowerCase())
+    && ws.filter(x => x.toLowerCase() === w.toLowerCase()).length === 1);
+  if(!cands.length) return null;
+  const answer = cands[Math.floor(rnd() * cands.length)];
+  const low = answer.toLowerCase();
+  const inSent = new Set(ws.map(w => w.toLowerCase()));
+  let near = pool.filter(w => w !== low && !inSent.has(w) && Math.abs(w.length - answer.length) <= 3);
+  if(near.length < 3) near = pool.filter(w => w !== low && !inSent.has(w));
+  if(near.length < 3) return null;
+  const picks = shuffle(near, rnd).slice(0,3).map(w => matchCase(answer, w));
+  used.add(low);
+  return { type:'cloze', sentence: sent, answer, options: shuffle([answer, ...picks], rnd) };
+}
+function orderFrom(sents, rnd){
+  const starts = [];
+  for(let i=0; i<sents.length-2; i++){
+    const ok = [0,1,2].every(k => { const n = wordsIn(sents[i+k]).length; return n >= 5 && n <= 30; });
+    if(ok) starts.push(i);
+  }
+  if(!starts.length) return null;
+  const start = starts[Math.floor(rnd() * starts.length)];
+  const items = sents.slice(start, start+3);
+  let order = shuffle([0,1,2], rnd), guard = 0;
+  while(order.every((v,i) => v === i) && guard++ < 8) order = shuffle([0,1,2], rnd);
+  return { type:'order', items: order.map(i => items[i]), correct: order };
+}
+function buildExercises(book, idx){
+  const sents = lessonSentences(book, idx);
+  const rnd = mulberry32(hash(book.id + ':' + idx));
+  const pool = distractorPool(book, idx);
+  const used = new Set();
+  const ex = [];
+  const half = Math.ceil(sents.length / 2);
+  [sents.slice(0, half), sents.slice(half)].forEach(zone => {
+    for(const s of shuffle(zone, rnd)){ const c = clozeFrom(s, rnd, pool, used); if(c){ ex.push(c); break; } }
+  });
+  const ord = orderFrom(sents, rnd);
+  if(ord) ex.splice(1, 0, ord);
+  if(ex.length < 2){
+    for(const s of shuffle(sents, rnd)){ const c = clozeFrom(s, rnd, pool, used); if(c){ ex.push(c); if(ex.length >= 2) break; } }
+  }
+  return ex;
+}
+
+/* ---------------- progress helpers ---------------- */
+function progOf(id){ if(!S.prog[id]) S.prog[id] = { done:{} }; return S.prog[id]; }
+function doneCount(id){ return Object.keys(progOf(id).done).length; }
+function nextIndex(book){
+  const d = progOf(book.id).done;
+  for(let i=0;i<book.lessons.length;i++) if(!d[i]) return i;
+  return -1;
+}
+function escapeRe(s){ return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+
+/* ---------------- HUD ---------------- */
+function renderHUD(){
+  $('#hud-streak').textContent = S.streak;
+  $('#hud-hearts').textContent = S.hearts;
+  $('#hud-xp').textContent = fmt(S.xp);
+  $('#lesson-hearts').textContent = S.hearts;
+  const pct = clamp(S.dayXp / S.goal, 0, 1);
+  const C = 2 * Math.PI * 15;
+  $('#ring-fg').style.strokeDashoffset = String(C - C * pct);
+  $('#ring-txt').textContent = Math.round(pct * 100) + '%';
+  $('#goal-ring').title = S.dayXp + ' of ' + S.goal + ' XP today';
+}
+
+/* ---------------- library ---------------- */
+function renderLibrary(){
+  renderHUD();
+  $('#s-words').textContent = fmt(S.words);
+  $('#s-lessons').textContent = S.lessonsDone;
+  $('#s-acc').textContent = S.attempts ? Math.round(S.correct / S.attempts * 100) + '%' : '--';
+
+  const shelf = $('#shelf'); shelf.textContent = '';
+  if(!S.order.length){
+    shelf.appendChild(el('div','empty','Nothing on the shelf yet.<br>Add a book and it becomes a path of passages.'));
+    return;
+  }
+  S.order.forEach(id => {
+    const b = S.books[id]; if(!b) return;
+    const done = doneCount(id), total = b.lessons.length;
+    const pct = Math.round(done / total * 100);
+    const card = el('button','book');
+    card.innerHTML =
+      '<span class="spine" style="background:hsl(' + b.hue + ' 44% 54%)"></span>' +
+      '<span style="flex:1;min-width:0">' +
+        '<span class="t">' + esc(b.title) + '</span>' +
+        '<span class="a">' + esc(b.author || 'Unknown') + '</span>' +
+        '<span class="bar"><i style="width:' + pct + '%"></i></span>' +
+        '<span class="m">' + done + ' / ' + total + ' passages &middot; ' + pct + '%</span>' +
+      '</span>';
+    card.addEventListener('click', () => openBook(id));
+    const kill = el('button','kill','&times;');
+    kill.title = 'Remove book';
+    kill.addEventListener('click', e => { e.stopPropagation(); confirmDelete(id); });
+    card.appendChild(kill);
+    shelf.appendChild(card);
+  });
+}
+
+/* ---------------- the path ---------------- */
+const OFFSETS = [0, 46, 70, 46, 0, -46, -70, -46];
+let currentBook = null;
+
+function openBook(id){
+  currentBook = id;
+  const b = S.books[id];
+  $('#path-title').firstChild.textContent = b.title;
+  $('#path-sub').textContent = (b.author ? b.author.toUpperCase() + ' / ' : '') + b.lessons.length + ' PASSAGES';
+  $('#view-library').hidden = true;
+  $('#view-path').hidden = false;
+  renderPath();
+  window.scrollTo(0,0);
+}
+function renderPath(){
+  renderHUD();
+  const b = S.books[currentBook];
+  const host = $('#path-nodes'); host.textContent = '';
+  const done = progOf(b.id).done;
+  const open = nextIndex(b);
+
+  b.lessons.forEach((_, i) => {
+    if(i % 8 === 0){
+      const u = el('div','unit');
+      u.innerHTML = '<span class="tag">Part ' + (i/8 + 1) + '</span><span class="rule"></span>';
+      host.appendChild(u);
+    }
+    const row = el('div','row');
+    const node = el('button','node');
+    node.style.transform = 'translateX(' + OFFSETS[i % OFFSETS.length] + 'px)';
+    const rec = done[i];
+    if(rec){
+      node.className = 'node done' + (rec.perfect ? ' perfect' : '');
+      node.innerHTML = rec.perfect
+        ? '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.6l2.6 6.1 6.6.5-5 4.3 1.5 6.4L12 16.5 6.3 19.9l1.5-6.4-5-4.3 6.6-.5L12 2.6Z"/></svg>'
+        : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7"/></svg>';
+      node.setAttribute('aria-label', 'Passage ' + (i+1) + ', complete. Read again.');
+    } else if(i === open){
+      node.className = 'node open';
+      node.innerHTML = '<span class="n">' + (i+1) + '</span>';
+      node.appendChild(el('span','flag', doneCount(b.id) ? 'Continue' : 'Start'));
+      node.setAttribute('aria-label', 'Passage ' + (i+1) + ', next up');
+    } else {
+      node.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><rect x="5" y="10.5" width="14" height="9.5" rx="2.4"/><path d="M8.4 10.5V8a3.6 3.6 0 0 1 7.2 0v2.5"/></svg>';
+      node.disabled = true;
+      node.setAttribute('aria-label', 'Passage ' + (i+1) + ', locked');
+    }
+    if(!node.disabled) node.addEventListener('click', () => startLesson(b.id, i));
+    row.appendChild(node);
+    host.appendChild(row);
+  });
+
+  requestAnimationFrame(() => {
+    drawThread();
+    const cur = host.querySelector('.node.open') || host.querySelector('.node.done:last-of-type');
+    if(cur) cur.scrollIntoView({ block:'center', behavior:'auto' });
+  });
+}
+function drawThread(){
+  const wrap = $('#pathwrap'), svg = $('#thread'), p = $('#thread-p');
+  const nodes = [...wrap.querySelectorAll('.node')];
+  if(nodes.length < 2){ p.setAttribute('d',''); return; }
+  const wr = wrap.getBoundingClientRect();
+  svg.setAttribute('viewBox', '0 0 ' + wr.width + ' ' + wr.height);
+  let d = '';
+  nodes.forEach((n, i) => {
+    const r = n.getBoundingClientRect();
+    const x = r.left - wr.left + r.width/2, y = r.top - wr.top + r.height/2;
+    d += (i ? ' L ' : 'M ') + x.toFixed(1) + ' ' + y.toFixed(1);
+  });
+  p.setAttribute('d', d);
+}
+window.addEventListener('resize', () => { if(!$('#view-path').hidden) drawThread(); });
+
+/* ---------------- a lesson: read, then prove it ---------------- */
+let L = null;
+
+function startLesson(bookId, idx){
+  const book = S.books[bookId];
+  const ex = buildExercises(book, idx);
+  L = { bookId, idx, ex, i:0, phase:'read', right:0, wrong:0, sel:null, order:[], checked:false, replay: !!progOf(bookId).done[idx] };
+  $('#sheet').classList.add('on');
+  document.body.style.overflow = 'hidden';
+  renderStage();
+}
+function closeLesson(){
+  $('#sheet').classList.remove('on');
+  document.body.style.overflow = '';
+  L = null;
+  if(!$('#view-path').hidden) renderPath(); else renderLibrary();
+}
+function setProg(){
+  const total = L.ex.length + 1;
+  const step = L.phase === 'read' ? 0.35 : L.i + 1;
+  $('#lesson-prog').style.width = clamp(step / total * 100, 3, 100) + '%';
+}
+function renderStage(){
+  const stage = $('#stage'), foot = $('#footer');
+  stage.textContent = ''; foot.className = 'footer'; foot.textContent = '';
+  $('#lesson-hearts').textContent = S.hearts;
+  setProg();
+  if(L.phase === 'read') return renderRead(stage, foot);
+  if(L.phase === 'done') return renderResults(stage, foot);
+  renderExercise(stage, foot);
+  stage.scrollTop = 0;
+}
+
+function renderRead(stage, foot){
+  const book = S.books[L.bookId];
+  const tools = el('div','reading-tools');
+  tools.innerHTML = '<span class="label" style="flex:1">Passage ' + (L.idx+1) + ' of ' + book.lessons.length + '</span>';
+  [['A','-',-0.09],['A','+',0.09]].forEach(([a,sign,delta]) => {
+    const b = el('button','tool', a + sign);
+    b.title = (delta < 0 ? 'Smaller' : 'Larger') + ' text';
+    b.addEventListener('click', () => {
+      S.rs = clamp(S.rs + delta, 0.9, 1.6); save();
+      stage.querySelector('.passage').style.setProperty('--rs', S.rs + 'rem');
+    });
+    tools.appendChild(b);
+  });
+  stage.appendChild(tools);
+
+  const pas = el('div','passage');
+  pas.style.setProperty('--rs', S.rs + 'rem');
+  book.lessons[L.idx].p.forEach(p => pas.appendChild(el('p', null, esc(p))));
+  stage.appendChild(pas);
+
+  const btn = el('button','btn','Ready &mdash; ask me');
+  btn.addEventListener('click', () => { L.phase = 'ex'; renderStage(); });
+  foot.appendChild(btn);
+  stage.scrollTop = 0;
+}
+
+function renderExercise(stage, foot){
+  const ex = L.ex[L.i];
+  L.sel = null; L.order = []; L.checked = false;
+  stage.appendChild(el('div','label', ex.type === 'cloze' ? 'Fill the gap' : 'Put these back in order'));
+
+  if(ex.type === 'cloze'){
+    const m = ex.sentence.match(new RegExp('\\b' + escapeRe(ex.answer) + '\\b'));
+    const at = m ? m.index : 0;
+    const q = el('div','q');
+    q.innerHTML = '<em>' + esc(ex.sentence.slice(0, at)) + '</em><span class="blank"></span><em>' +
+                  esc(ex.sentence.slice(at + ex.answer.length)) + '</em>';
+    stage.appendChild(q);
+    const opts = el('div','opts');
+    ex.options.forEach(o => {
+      const b = el('button','opt', esc(o));
+      b.addEventListener('click', () => {
+        if(L.checked) return;
+        opts.querySelectorAll('.opt').forEach(x => x.classList.remove('sel'));
+        b.classList.add('sel'); L.sel = o; refreshCheck();
+      });
+      opts.appendChild(b);
+    });
+    stage.appendChild(opts);
+  } else {
+    const slots = el('div','slots');
+    for(let k=0;k<3;k++){
+      const s = el('div','slot');
+      s.innerHTML = '<span class="i">' + (k+1) + '</span>';
+      slots.appendChild(s);
+    }
+    stage.appendChild(slots);
+    const pool = el('div','pool');
+    ex.items.forEach((txt, k) => {
+      const c = el('button','chip', esc(txt));
+      c.dataset.k = k;
+      c.addEventListener('click', () => {
+        if(L.checked) return;
+        const pos = L.order.indexOf(k);
+        if(pos > -1) L.order.splice(pos, 1); else if(L.order.length < 3) L.order.push(k);
+        paintOrder(slots, pool, ex);
+        refreshCheck();
+      });
+      pool.appendChild(c);
+    });
+    stage.appendChild(pool);
+    paintOrder(slots, pool, ex);
+  }
+  buildFooterCheck(foot);
+}
+function paintOrder(slots, pool, ex){
+  [...slots.children].forEach((s, k) => {
+    s.innerHTML = '<span class="i">' + (k+1) + '</span>';
+    const idx = L.order[k];
+    if(idx != null){
+      const chip = el('button','chip in', esc(ex.items[idx]));
+      chip.addEventListener('click', () => { if(L.checked) return; L.order.splice(k,1); paintOrder(slots,pool,ex); refreshCheck(); });
+      s.appendChild(chip);
+    }
+  });
+  [...pool.children].forEach(c => { c.style.display = L.order.includes(+c.dataset.k) ? 'none' : ''; });
+}
+function buildFooterCheck(foot){
+  foot.textContent = '';
+  const btn = el('button','btn','Check');
+  btn.id = 'btn-check'; btn.disabled = true;
+  btn.addEventListener('click', check);
+  foot.appendChild(btn);
+}
+function refreshCheck(){
+  const ex = L.ex[L.i];
+  const ready = ex.type === 'cloze' ? L.sel != null : L.order.length === 3;
+  $('#btn-check').disabled = !ready;
+}
+function check(){
+  const ex = L.ex[L.i];
+  L.checked = true;
+  const ok = ex.type === 'cloze'
+    ? L.sel === ex.answer
+    : L.order.map(k => ex.correct[k]).every((v, i) => v === i);
+
+  S.attempts++; if(ok) S.correct++;
+  const stage = $('#stage'), foot = $('#footer');
+
+  if(ex.type === 'cloze'){
+    stage.querySelectorAll('.opt').forEach(b => {
+      b.disabled = true;
+      if(b.textContent === ex.answer) b.className = 'opt right';
+      else if(b.classList.contains('sel')) b.className = 'opt wrong';
+    });
+  } else {
+    const right = ex.items.map((t,k) => [t, ex.correct[k]]).sort((a,b) => a[1]-b[1]).map(x => x[0]);
+    stage.querySelectorAll('.slot').forEach((s,k) => {
+      s.innerHTML = '<span class="i">' + (k+1) + '</span>';
+      const chip = el('button','chip in', esc(right[k]));
+      chip.disabled = true;
+      s.appendChild(chip);
+    });
+    stage.querySelector('.pool').style.display = 'none';
+  }
+
+  if(ok){ L.right++; }
+  else { L.wrong++; S.hearts = Math.max(0, S.hearts - 1); $('#lesson-hearts').textContent = S.hearts; }
+  save();
+
+  foot.className = 'footer ' + (ok ? 'correct' : 'miss');
+  foot.textContent = '';
+  const v = el('div','verdict');
+  v.innerHTML = ok
+    ? '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7"/></svg><span>You had it<span class="sub">+4 XP</span></span>'
+    : '<span>Not this time<span class="sub">' + (ex.type === 'cloze' ? 'The word was <b>' + esc(ex.answer) + '</b>' : 'The right order is shown above') + '</span></span>';
+  foot.appendChild(v);
+  const btn = el('button','btn', L.i === L.ex.length - 1 ? 'Finish' : 'Continue');
+  btn.addEventListener('click', advance);
+  foot.appendChild(btn);
+}
+function advance(){
+  if(S.hearts <= 0){ closeLesson(); outOfHearts(); return; }
+  L.i++;
+  if(L.i >= L.ex.length){ finish(); return; }
+  renderStage();
+}
+function finish(){
+  const book = S.books[L.bookId];
+  const perfect = L.wrong === 0;
+  const gained = L.right * 4 + (perfect ? 8 : 0);
+  const first = !progOf(book.id).done[L.idx];
+
+  S.xp += gained; S.dayXp += gained;
+  progOf(book.id).done[L.idx] = { perfect: perfect || !!(progOf(book.id).done[L.idx] || {}).perfect };
+  if(first){ S.words += lessonWords(book, L.idx); S.lessonsDone++; }
+
+  const today = dayKey();
+  let streakUp = false;
+  if(S.lastDay !== today){
+    S.streak = (S.lastDay && daysBetween(S.lastDay, today) === 1) ? S.streak + 1 : 1;
+    S.lastDay = today; streakUp = true;
+  }
+  save();
+  L.phase = 'done'; L.gained = gained; L.perfect = perfect; L.streakUp = streakUp;
+  renderStage();
+  burst();
+}
+function renderResults(stage, foot){
+  stage.textContent = '';
+  const book = S.books[L.bookId];
+  const left = book.lessons.length - doneCount(book.id);
+  const wrap = el('div','center');
+  wrap.innerHTML =
+    '<span class="label">' + (L.perfect ? 'Flawless passage' : 'Passage complete') + '</span>' +
+    '<h2>' + (L.perfect ? 'Not a word out of place.' : 'That one is yours.') + '</h2>' +
+    '<p style="color:var(--ink-soft);font-family:var(--f-read);max-width:30ch;line-height:1.5;margin:8px 0 0">' +
+      (left ? left + ' passage' + (left === 1 ? '' : 's') + ' left in ' + esc(book.title) + '.' : 'You have finished ' + esc(book.title) + '.') + '</p>' +
+    '<div class="awards">' +
+      '<div class="award xp"><div class="in"><div class="k">XP earned</div><div class="v">+' + L.gained + '</div></div></div>' +
+      '<div class="award st"><div class="in"><div class="k">' + (L.streakUp ? 'Streak extended' : 'Day streak') + '</div><div class="v">' + S.streak + '</div></div></div>' +
+      '<div class="award"><div class="in"><div class="k">Correct</div><div class="v">' + L.right + '/' + L.ex.length + '</div></div></div>' +
+      '<div class="award"><div class="in"><div class="k">Words read</div><div class="v">' + fmt(lessonWords(book, L.idx)) + '</div></div></div>' +
+    '</div>';
+  stage.appendChild(wrap);
+  $('#lesson-prog').style.width = '100%';
+  const btn = el('button','btn blue','Back to the path');
+  btn.addEventListener('click', closeLesson);
+  foot.appendChild(btn);
+}
+
+/* ---------------- halftone burst ---------------- */
+function ink(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || '#E4483A'; }
+function burst(){
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const c = $('#burst'), ctx = c.getContext('2d');
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  c.width = innerWidth * dpr; c.height = innerHeight * dpr; c.style.display = 'block';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const inks = [ink('--red'), ink('--blue'), ink('--yellow')];
+  const cx = innerWidth / 2, cy = innerHeight * 0.4, dots = [];
+  for(let i=0;i<72;i++){
+    const a = Math.random() * Math.PI * 2, sp = 2 + Math.random() * 7;
+    dots.push({ x:cx, y:cy, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp - 3.4, r:3 + Math.random()*7, c:inks[i%3], life:1 });
+  }
+  let last = performance.now();
+  (function frame(t){
+    const dt = Math.min((t - last) / 16.7, 3); last = t;
+    ctx.clearRect(0, 0, innerWidth, innerHeight);
+    let alive = false;
+    dots.forEach(d => {
+      d.x += d.vx*dt; d.y += d.vy*dt; d.vy += 0.24*dt; d.life -= 0.013*dt;
+      if(d.life > 0){
+        alive = true; ctx.globalAlpha = d.life; ctx.fillStyle = d.c;
+        ctx.beginPath(); ctx.arc(d.x, d.y, d.r, 0, 6.29); ctx.fill();
+      }
+    });
+    if(alive) requestAnimationFrame(frame); else c.style.display = 'none';
+  })(last);
+}
+
+/* ---------------- modals ---------------- */
+function openModal(html){ $('#modal-box').innerHTML = html; $('#modal').classList.add('on'); }
+function closeModal(){ $('#modal').classList.remove('on'); $('#modal-box').textContent = ''; }
+$('#modal').addEventListener('click', e => { if(e.target.id === 'modal') closeModal(); });
+document.addEventListener('keydown', e => {
+  if(e.key !== 'Escape') return;
+  if($('#modal').classList.contains('on')) closeModal();
+  else if($('#sheet').classList.contains('on')) confirmQuit();
+});
+
+function outOfHearts(){
+  const can = S.xp >= 50;
+  openModal(
+    '<h3>Out of hearts</h3>' +
+    '<p>Five misses today. Hearts come back tomorrow &mdash; or trade 50 XP for a full set and keep going now.</p>' +
+    '<div class="stack">' +
+      '<button class="btn" id="m-refill"' + (can ? '' : ' disabled') + '>' + (can ? 'Refill for 50 XP' : 'Need 50 XP (you have ' + S.xp + ')') + '</button>' +
+      '<button class="btn ghost" id="m-close">Come back tomorrow</button>' +
+    '</div>');
+  $('#m-close').addEventListener('click', closeModal);
+  if(can) $('#m-refill').addEventListener('click', () => { S.xp -= 50; S.hearts = 5; save(); closeModal(); renderHUD(); });
+}
+function confirmQuit(){
+  if(L && L.phase === 'done'){ closeLesson(); return; }
+  openModal(
+    '<h3>Leave this passage?</h3>' +
+    '<p>Your place in it will not be saved, and you will start the passage again from the top.</p>' +
+    '<div class="stack"><button class="btn" id="m-stay">Keep reading</button>' +
+    '<button class="btn ghost" id="m-leave">Leave</button></div>');
+  $('#m-stay').addEventListener('click', closeModal);
+  $('#m-leave').addEventListener('click', () => { closeModal(); closeLesson(); });
+}
+function confirmDelete(id){
+  const b = S.books[id];
+  openModal(
+    '<h3>Remove ' + esc(b.title) + '?</h3>' +
+    '<p>The text and your progress through it are deleted from this browser. Your XP and streak stay.</p>' +
+    '<div class="stack"><button class="btn ghost" id="m-cancel">Keep it</button>' +
+    '<button class="btn" id="m-del">Remove</button></div>');
+  $('#m-cancel').addEventListener('click', closeModal);
+  $('#m-del').addEventListener('click', () => {
+    delete S.books[id]; delete S.prog[id];
+    S.order = S.order.filter(x => x !== id);
+    save(); closeModal(); renderLibrary();
+  });
+}
+
+/* ---------------- adding a book ---------------- */
+function addBookModal(){
+  openModal(
+    '<h3>Add a book</h3>' +
+    '<p>Paste the text, or load a plain-text file. It is sliced into passages of about ' + TARGET + ' words and stays on this device.</p>' +
+    '<input type="text" id="f-title" placeholder="Title" autocomplete="off">' +
+    '<input type="text" id="f-author" placeholder="Author (optional)" autocomplete="off">' +
+    '<label class="file">Load a .txt file<input type="file" id="f-file" accept=".txt,text/plain"></label>' +
+    '<textarea id="f-text" placeholder="Or paste the text here..."></textarea>' +
+    '<p class="hint" id="f-note">Project Gutenberg headers and licence footers are trimmed automatically.</p>' +
+    '<div class="stack"><button class="btn" id="m-save">Build the path</button>' +
+    '<button class="btn ghost" id="m-cancel">Cancel</button></div>');
+  $('#m-cancel').addEventListener('click', closeModal);
+  $('#f-file').addEventListener('change', e => {
+    const f = e.target.files[0]; if(!f) return;
+    const fr = new FileReader();
+    fr.onload = () => {
+      $('#f-text').value = fr.result;
+      if(!$('#f-title').value) $('#f-title').value = f.name.replace(/\.txt$/i, '').replace(/[_-]+/g, ' ');
+      note(f.name + ' loaded, ' + fmt(wordsIn(fr.result).length) + ' words.');
+    };
+    fr.onerror = () => note('That file could not be read. Try pasting the text instead.');
+    fr.readAsText(f);
+  });
+  $('#m-save').addEventListener('click', () => {
+    const text = $('#f-text').value.trim();
+    if(wordsIn(text).length < 60) return note('That is too short to build a path. Around 60 words minimum.');
+    const lessons = buildLessons(text);
+    if(!lessons.length) return note('No readable passages found in that text.');
+    const id = 'b' + Date.now().toString(36);
+    const snapshot = JSON.stringify(S);
+    S.books[id] = { id, title: $('#f-title').value.trim() || 'Untitled', author: $('#f-author').value.trim(),
+                    hue: Math.floor(Math.random()*360), lessons };
+    S.order.unshift(id);
+    if(!save()){
+      S = JSON.parse(snapshot);
+      return note('This browser ran out of storage for that book. Remove a book, or add a shorter text.');
+    }
+    closeModal(); renderLibrary(); openBook(id);
+  });
+}
+function note(msg){ const n = $('#f-note'); if(n){ n.textContent = msg; n.style.color = 'var(--red)'; } }
+
+/* ---------------- boot ---------------- */
+$('#btn-add').addEventListener('click', addBookModal);
+$('#btn-back').addEventListener('click', () => { $('#view-path').hidden = true; $('#view-library').hidden = false; renderLibrary(); });
+$('#btn-quit').addEventListener('click', confirmQuit);
+
+rollDay();
+if(!S.seeded){
+  S.books.sample = { id:'sample', title:SAMPLE.title, author:SAMPLE.author, hue:SAMPLE.hue, lessons:buildLessons(SAMPLE.text) };
+  S.order.push('sample');
+  S.seeded = true;
+  save();
+}
+renderLibrary();
+</script>
