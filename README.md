@@ -17,7 +17,7 @@ Start with `CLAUDE.md`. Agents are Claude Code commands in `.claude/commands/`.
 ## Build phases
 - Phase 1: brain, channel config, knowledge templates, `/intake` — done
 - Phase 2: `/write-script`, `/hooks`, `/review`, queue format, `scripts/studio` — done
-- Phase 3: `/research-week`, `/plan-week`, competitors
+- Phase 3: `/research-week`, `/plan-week`, competitors, first weekly plan — done
 - Phase 4: `/ingest-analytics`, `/brief`, `/scorecard`, `studio.db`
 
 Requirements: Python 3.11+, no network, no paid services.

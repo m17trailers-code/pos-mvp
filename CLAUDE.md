@@ -95,5 +95,5 @@ Self-check
 
 - Phase 1 (this file, channel config, knowledge templates, `/intake`): built.
 - Phase 2 (`/write-script`, `/hooks`, `/review`, queue format, `scripts/studio`): built.
-- Phase 3 (`/research-week`, `/plan-week`, competitors): not built.
+- Phase 3 (`/research-week`, `/plan-week`, competitors template, first plan `plans/2026-40.md`): built.
 - Phase 4 (`/ingest-analytics`, `/brief`, `/scorecard`, `studio.db`): not built.
