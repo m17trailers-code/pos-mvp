@@ -1,0 +1,127 @@
+#!/usr/bin/env python3
+"""studio — CLI helpers for M17 Studio. No network, no TikTok, stdlib only.
+
+  studio list                 show queue + posted with status
+  studio approve <slug>       mark a queue draft APPROVED (owner action)
+  studio posted <slug>        mark POSTED, move queue/<slug> -> posted/<slug>, add stats.md
+  studio ingest <file>        (Phase 4) load an analytics CSV into studio.db
+"""
+import shutil
+import sys
+from datetime import date
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+QUEUE = ROOT / "queue"
+POSTED = ROOT / "posted"
+STATUSES = ("DRAFT", "APPROVED", "POSTED")
+
+
+def die(msg, code=1):
+    print(f"studio: {msg}", file=sys.stderr)
+    sys.exit(code)
+
+
+def read_status(folder):
+    f = folder / "status.md"
+    if not f.exists():
+        return None
+    first = f.read_text(encoding="utf-8").splitlines()[0].strip() if f.stat().st_size else ""
+    return first if first in STATUSES else f"?{first[:20]}"
+
+
+def write_status(folder, new):
+    f = folder / "status.md"
+    lines = f.read_text(encoding="utf-8").splitlines() if f.exists() else []
+    if lines and lines[0].strip() in STATUSES:
+        lines[0] = new
+    else:
+        lines.insert(0, new)
+    f.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def find_queue(slug):
+    folder = QUEUE / slug
+    if not folder.is_dir():
+        matches = [p for p in QUEUE.iterdir() if p.is_dir() and p.name.endswith(slug)]
+        if len(matches) == 1:
+            return matches[0]
+        die(f"no queue folder matching '{slug}'" + (f" ({len(matches)} matches)" if matches else ""))
+    return folder
+
+
+def cmd_list(_):
+    for label, base in (("queue", QUEUE), ("posted", POSTED)):
+        print(f"{label}/")
+        folders = sorted(p for p in base.iterdir() if p.is_dir()) if base.exists() else []
+        if not folders:
+            print("  (empty)")
+        for p in folders:
+            print(f"  {read_status(p) or '-':9} {p.name}")
+
+
+def cmd_approve(args):
+    if not args:
+        die("usage: studio approve <slug>")
+    folder = find_queue(args[0])
+    for req in ("script.md", "shots.md", "caption.md"):
+        if not (folder / req).exists():
+            die(f"{folder.name} is missing {req}; not approving")
+    if read_status(folder) == "POSTED":
+        die(f"{folder.name} is already POSTED")
+    write_status(folder, "APPROVED")
+    print(f"APPROVED  {folder.name}")
+
+
+STATS_TEMPLATE = """# stats — {slug}
+
+Posted: {today}
+Paste from TikTok analytics, then run `studio ingest` (Phase 4) or `/ingest-analytics`.
+
+| Metric | Value |
+|---|---|
+| Views | |
+| Likes | |
+| Comments | |
+| Shares | |
+| Saves | |
+| New followers | |
+| Avg watch time (s) | |
+| Full-watch % | |
+| 3s retention % | |
+| 50% retention % | |
+| Traffic: For You % | |
+
+## Owner notes
+"""
+
+
+def cmd_posted(args):
+    if not args:
+        die("usage: studio posted <slug>")
+    folder = find_queue(args[0])
+    if read_status(folder) != "APPROVED":
+        die(f"{folder.name} is {read_status(folder)}; approve it first (studio approve)")
+    POSTED.mkdir(exist_ok=True)
+    dest = POSTED / folder.name
+    if dest.exists():
+        die(f"{dest} already exists")
+    write_status(folder, "POSTED")
+    shutil.move(str(folder), str(dest))
+    stats = dest / "stats.md"
+    if not stats.exists():
+        stats.write_text(STATS_TEMPLATE.format(slug=folder.name, today=date.today().isoformat()), encoding="utf-8")
+    print(f"POSTED    {dest.relative_to(ROOT)}  (stats.md created — fill it in after 24h)")
+
+
+def cmd_ingest(args):
+    die("ingest is built in Phase 4 (studio.db + /ingest-analytics). Drop the file in inbox/ for now.", 2)
+
+
+COMMANDS = {"list": cmd_list, "approve": cmd_approve, "posted": cmd_posted, "ingest": cmd_ingest}
+
+if __name__ == "__main__":
+    if len(sys.argv) < 2 or sys.argv[1] in ("-h", "--help", "help") or sys.argv[1] not in COMMANDS:
+        print(__doc__.strip())
+        sys.exit(0 if len(sys.argv) >= 2 and sys.argv[1] in ("-h", "--help", "help") else 1)
+    COMMANDS[sys.argv[1]](sys.argv[2:])

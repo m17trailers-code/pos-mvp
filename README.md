@@ -16,7 +16,7 @@ Start with `CLAUDE.md`. Agents are Claude Code commands in `.claude/commands/`.
 
 ## Build phases
 - Phase 1: brain, channel config, knowledge templates, `/intake` — done
-- Phase 2: `/write-script`, `/hooks`, `/review`, queue format
+- Phase 2: `/write-script`, `/hooks`, `/review`, queue format, `scripts/studio` — done
 - Phase 3: `/research-week`, `/plan-week`, competitors
 - Phase 4: `/ingest-analytics`, `/brief`, `/scorecard`, `studio.db`
 

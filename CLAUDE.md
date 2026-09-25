@@ -58,7 +58,8 @@ and Higgsfield prompts; the owner generates, edits and posts the video.
 | `posted/YYYY-MM-DD_slug/` | moved here after posting; owner adds `stats.md` |
 | `reports/daily-brief.md` | rewritten every morning |
 | `reports/weekly-scorecard.md` | rewritten every Sunday |
-| `scripts/` | CLI helpers (`studio approve`, `studio posted`, `studio ingest`) |
+| `scripts/studio` | CLI: `list`, `approve <slug>`, `posted <slug>`, `ingest <file>` (Phase 4) |
+| `research/hooks/` | output of `/hooks` |
 
 ## Conventions
 
@@ -93,6 +94,6 @@ Self-check
 ## Build status
 
 - Phase 1 (this file, channel config, knowledge templates, `/intake`): built.
-- Phase 2 (`/write-script`, `/hooks`, `/review`, queue format): not built.
+- Phase 2 (`/write-script`, `/hooks`, `/review`, queue format, `scripts/studio`): built.
 - Phase 3 (`/research-week`, `/plan-week`, competitors): not built.
 - Phase 4 (`/ingest-analytics`, `/brief`, `/scorecard`, `studio.db`): not built.
