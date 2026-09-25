@@ -159,7 +159,7 @@ COLS = {
 
 
 def norm(h):
-    return re.sub(r"[^a-z0-9 ]+", " ", h.lower().replace("%", " pct ")).strip()
+    return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9 ]+", " ", h.lower().replace("%", " pct "))).strip()
 
 
 def num(v):
