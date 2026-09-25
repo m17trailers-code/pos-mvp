@@ -4,16 +4,22 @@
   studio list                 show queue + posted with status
   studio approve <slug>       mark a queue draft APPROVED (owner action)
   studio posted <slug>        mark POSTED, move queue/<slug> -> posted/<slug>, add stats.md
-  studio ingest <file>        (Phase 4) load an analytics CSV into studio.db
+  studio ingest <file>        load a TikTok analytics CSV into studio.db and refresh posted/*/stats.md
+  studio stats [YYYY-WW|all]  print per-video metrics (per-1K rates) for a week, default: last 7 days
+  studio db                   print the studio.db path and row counts
 """
+import csv
+import re
 import shutil
+import sqlite3
 import sys
-from datetime import date
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 QUEUE = ROOT / "queue"
 POSTED = ROOT / "posted"
+DB = ROOT / "studio.db"
 STATUSES = ("DRAFT", "APPROVED", "POSTED")
 
 
@@ -114,11 +120,283 @@ def cmd_posted(args):
     print(f"POSTED    {dest.relative_to(ROOT)}  (stats.md created — fill it in after 24h)")
 
 
+
+# ---------------------------------------------------------------- analytics
+
+SCHEMA = """
+CREATE TABLE IF NOT EXISTS videos (
+  slug TEXT PRIMARY KEY, title TEXT, posted_at TEXT, format TEXT,
+  length_s INTEGER, hook_text TEXT
+);
+CREATE TABLE IF NOT EXISTS stats (
+  slug TEXT, captured_at TEXT, source TEXT,
+  views INTEGER, likes INTEGER, comments INTEGER, shares INTEGER, saves INTEGER,
+  follows INTEGER, avg_watch_s REAL, full_watch_pct REAL, ret3_pct REAL, ret50_pct REAL,
+  PRIMARY KEY (slug, captured_at)
+);
+"""
+
+# CSV header synonyms -> our field names (lower-cased, punctuation stripped)
+COLS = {
+    "slug": ["slug"],
+    "title": ["video title", "title", "caption", "video"],
+    "link": ["video link", "link", "url"],
+    "posted_at": ["post time", "posted", "publish time", "date", "posted at"],
+    "format": ["format"],
+    "length_s": ["length s", "length", "duration", "video length"],
+    "hook_text": ["hook text", "hook", "on screen text"],
+    "views": ["video views", "views", "total views", "plays"],
+    "likes": ["likes", "total likes"],
+    "comments": ["comments", "total comments"],
+    "shares": ["shares", "total shares"],
+    "saves": ["saves", "favorites", "favourites", "bookmarks"],
+    "follows": ["new followers", "followers gained", "follows", "net followers"],
+    "avg_watch_s": ["average watch time", "avg watch time", "avg watch time s", "average watch time s"],
+    "full_watch_pct": ["watched full video", "full watch", "full watch pct", "completion rate"],
+    "ret3_pct": ["3s retention", "retention 3s", "ret3 pct", "3 second retention"],
+    "ret50_pct": ["50 retention", "50 pct retention", "retention 50", "retention 50 pct", "ret50 pct", "50 percent retention", "50pct retention"],
+}
+
+
+def norm(h):
+    return re.sub(r"[^a-z0-9 ]+", " ", h.lower().replace("%", " pct ")).strip()
+
+
+def num(v):
+    if v is None:
+        return None
+    s = str(v).strip().replace(",", "").replace("%", "")
+    if not s or s == "-":
+        return None
+    m = re.match(r"^(\d+)m(?::(\d+)s?)?$", s)  # 1m05s style watch time
+    if m:
+        return int(m.group(1)) * 60 + int(m.group(2) or 0)
+    m = re.match(r"^(\d+):(\d+)$", s)
+    if m:
+        return int(m.group(1)) * 60 + int(m.group(2))
+    mult = 1
+    if s[-1:].lower() == "k":
+        mult, s = 1000, s[:-1]
+    elif s[-1:].lower() == "m":
+        mult, s = 1_000_000, s[:-1]
+    try:
+        return float(s) * mult
+    except ValueError:
+        return None
+
+
+def slugify(s):
+    s = re.sub(r"[^a-z0-9]+", "-", s.lower()).strip("-")
+    return s[:40] or "untitled"
+
+
+def db():
+    con = sqlite3.connect(DB)
+    con.executescript(SCHEMA)
+    return con
+
+
+def match_posted_folder(slug, title):
+    """Prefer an exact posted/ folder; else the folder whose slug tail appears in the title."""
+    if not POSTED.exists():
+        return None
+    if slug and (POSTED / slug).is_dir():
+        return POSTED / slug
+    t = slugify(title or "")
+    for p in sorted(POSTED.iterdir()):
+        tail = p.name.split("_", 1)[-1]
+        if p.is_dir() and tail and (tail in t or (slug and tail == slug)):
+            return p
+    return None
+
+
+def script_meta(folder):
+    """Pull format / length / hook text from script.md if the folder has one."""
+    meta = {}
+    f = folder / "script.md"
+    if not f.exists():
+        return meta
+    txt = f.read_text(encoding="utf-8")
+    m = re.search(r"\*\*Format:\*\*\s*([^·\n]+)", txt)
+    if m:
+        meta["format"] = m.group(1).strip()
+    m = re.search(r"\*\*Length:\*\*[^\n]*?(\d+)s", txt)
+    if m:
+        meta["length_s"] = int(m.group(1))
+    m = re.search(r"On-screen text:\s*\*\*(.+?)\*\*", txt)
+    if m:
+        meta["hook_text"] = m.group(1).strip()
+    return meta
+
+
+def write_stats_md(folder, row, captured):
+    f = folder / "stats.md"
+    lines = [f"# stats — {folder.name}", "", f"Last ingest: {captured}", "",
+             "| Metric | Value |", "|---|---|"]
+    for label, key, fmt in (("Views", "views", "{:,.0f}"), ("Likes", "likes", "{:,.0f}"),
+                            ("Comments", "comments", "{:,.0f}"), ("Shares", "shares", "{:,.0f}"),
+                            ("Saves", "saves", "{:,.0f}"), ("New followers", "follows", "{:,.0f}"),
+                            ("Avg watch time (s)", "avg_watch_s", "{:.1f}"),
+                            ("Full-watch %", "full_watch_pct", "{:.1f}"),
+                            ("3s retention %", "ret3_pct", "{:.1f}"),
+                            ("50% retention %", "ret50_pct", "{:.1f}")):
+        v = row.get(key)
+        lines.append(f"| {label} | {fmt.format(v) if v is not None else ''} |")
+    notes = ""
+    if f.exists():
+        old = f.read_text(encoding="utf-8")
+        if "## Owner notes" in old:
+            notes = old.split("## Owner notes", 1)[1]
+    lines += ["", "## Owner notes" + notes.rstrip(), ""]
+    f.write_text("\n".join(lines), encoding="utf-8")
+
+
 def cmd_ingest(args):
-    die("ingest is built in Phase 4 (studio.db + /ingest-analytics). Drop the file in inbox/ for now.", 2)
+    if not args:
+        die("usage: studio ingest <file.csv>")
+    src = Path(args[0])
+    if not src.exists():
+        src = ROOT / "inbox" / args[0]
+    if not src.exists():
+        die(f"file not found: {args[0]}")
+    captured = datetime.now().strftime("%Y-%m-%dT%H:%M")
+    with src.open(encoding="utf-8-sig", newline="") as fh:
+        reader = csv.DictReader(fh)
+        if not reader.fieldnames:
+            die("empty CSV")
+        colmap = {}
+        for h in reader.fieldnames:
+            n = norm(h)
+            for field, names in COLS.items():
+                if n in names and field not in colmap:
+                    colmap[field] = h
+        if "views" not in colmap:
+            die(f"could not find a views column in {reader.fieldnames}")
+        rows = list(reader)
+    con = db()
+    n_new = n_upd = n_matched = 0
+    for r in rows:
+        get = lambda k: r.get(colmap[k]) if k in colmap else None
+        title = (get("title") or get("link") or "").strip()
+        slug = (get("slug") or "").strip()
+        folder = match_posted_folder(slug, title)
+        if folder:
+            slug = folder.name
+            n_matched += 1
+        elif not slug:
+            slug = slugify(title)
+        posted_at = (get("posted_at") or "").strip()[:16] or None
+        meta = script_meta(folder) if folder else {}
+        fmt = (get("format") or meta.get("format") or None)
+        length = num(get("length_s")) or meta.get("length_s")
+        hook = (get("hook_text") or meta.get("hook_text") or None)
+        cur = con.execute("SELECT slug FROM videos WHERE slug=?", (slug,)).fetchone()
+        if cur:
+            con.execute("""UPDATE videos SET title=COALESCE(?,title), posted_at=COALESCE(?,posted_at),
+                           format=COALESCE(?,format), length_s=COALESCE(?,length_s), hook_text=COALESCE(?,hook_text)
+                           WHERE slug=?""", (title or None, posted_at, fmt, length, hook, slug))
+            n_upd += 1
+        else:
+            con.execute("INSERT INTO videos VALUES (?,?,?,?,?,?)", (slug, title or None, posted_at, fmt, length, hook))
+            n_new += 1
+        stat = {k: num(get(k)) for k in ("views", "likes", "comments", "shares", "saves", "follows",
+                                          "avg_watch_s", "full_watch_pct", "ret3_pct", "ret50_pct")}
+        con.execute("INSERT OR REPLACE INTO stats VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                    (slug, captured, src.name, *[stat[k] for k in ("views", "likes", "comments", "shares", "saves",
+                                                                   "follows", "avg_watch_s", "full_watch_pct",
+                                                                   "ret3_pct", "ret50_pct")]))
+        if folder:
+            write_stats_md(folder, stat, captured)
+    con.commit()
+    con.close()
+    print(f"ingested {len(rows)} rows from {src.name}: {n_new} new videos, {n_upd} updated, "
+          f"{n_matched} matched to posted/ folders (stats.md refreshed)")
+    print("next: /brief (daily) or /scorecard (Sunday)")
 
 
-COMMANDS = {"list": cmd_list, "approve": cmd_approve, "posted": cmd_posted, "ingest": cmd_ingest}
+def latest_stats(con, since=None, until=None):
+    q = """
+    SELECT v.slug, v.title, v.posted_at, v.format, v.length_s, v.hook_text,
+           s.views, s.likes, s.comments, s.shares, s.saves, s.follows,
+           s.avg_watch_s, s.full_watch_pct, s.ret3_pct, s.ret50_pct, s.captured_at
+    FROM videos v JOIN stats s ON s.slug = v.slug
+    WHERE s.captured_at = (SELECT MAX(captured_at) FROM stats WHERE slug = v.slug)
+    """
+    params = []
+    if since:
+        q += " AND v.posted_at >= ?"
+        params.append(since)
+    if until:
+        q += " AND v.posted_at < ?"
+        params.append(until)
+    q += " ORDER BY v.posted_at"
+    cols = ["slug", "title", "posted_at", "format", "length_s", "hook_text", "views", "likes", "comments",
+            "shares", "saves", "follows", "avg_watch_s", "full_watch_pct", "ret3_pct", "ret50_pct", "captured_at"]
+    return [dict(zip(cols, r)) for r in con.execute(q, params)]
+
+
+def per_k(n, views):
+    return round(n / views * 1000, 2) if n is not None and views else None
+
+
+def cmd_stats(args):
+    if not DB.exists():
+        die("no studio.db yet; run studio ingest <file> first")
+    since = until = None
+    label = "last 7 days"
+    if args and args[0] != "all":
+        m = re.match(r"^(\d{4})-W?(\d{2})$", args[0])
+        if not m:
+            die("usage: studio stats [YYYY-WW|all]")
+        monday = date.fromisocalendar(int(m.group(1)), int(m.group(2)), 1)
+        since, until = monday.isoformat(), (monday + timedelta(days=7)).isoformat()
+        label = f"week {args[0]}"
+    elif args and args[0] == "all":
+        label = "all time"
+    else:
+        since = (date.today() - timedelta(days=7)).isoformat()
+    con = db()
+    rows = latest_stats(con, since, until)
+    con.close()
+    if not rows:
+        print(f"no videos for {label}")
+        return
+    print(f"# {label} — {len(rows)} videos (latest capture per video)")
+    print("slug | posted | fmt | len | views | ret3% | ret50% | full% | fol/1K | sav/1K | shr/1K | com/1K | hook")
+    tot_views = tot_fol = 0
+    longs = 0
+    for r in rows:
+        v = r["views"] or 0
+        tot_views += v
+        tot_fol += r["follows"] or 0
+        longs += 1 if (r["length_s"] or 0) >= 65 else 0
+        f = lambda x, d=1: "" if x is None else (f"{x:.{d}f}" if isinstance(x, float) else str(x))
+        print(" | ".join([
+            r["slug"], (r["posted_at"] or "")[:10], (r["format"] or "")[:12], f(r["length_s"], 0), f"{v:,.0f}",
+            f(r["ret3_pct"]), f(r["ret50_pct"]), f(r["full_watch_pct"]),
+            f(per_k(r["follows"], v), 2), f(per_k(r["saves"], v), 2), f(per_k(r["shares"], v), 2),
+            f(per_k(r["comments"], v), 2), (r["hook_text"] or "")[:50]]))
+    print(f"totals: views {tot_views:,.0f} · new followers {tot_fol:,.0f} · follows/1K {per_k(tot_fol, tot_views)} · long videos {longs}/{len(rows)}")
+    by_fmt = {}
+    for r in rows:
+        by_fmt.setdefault(r["format"] or "?", []).append(r)
+    print("by format: " + " · ".join(
+        f"{k}: n={len(v)}, views {sum(x['views'] or 0 for x in v):,.0f}, fol/1K {per_k(sum(x['follows'] or 0 for x in v), sum(x['views'] or 0 for x in v))}"
+        for k, v in by_fmt.items()))
+
+
+def cmd_db(_):
+    if not DB.exists():
+        print(f"{DB} (not created yet)")
+        return
+    con = db()
+    v, s = con.execute("SELECT COUNT(*) FROM videos").fetchone()[0], con.execute("SELECT COUNT(*) FROM stats").fetchone()[0]
+    con.close()
+    print(f"{DB}: {v} videos, {s} stat snapshots")
+
+
+COMMANDS = {"list": cmd_list, "approve": cmd_approve, "posted": cmd_posted, "ingest": cmd_ingest,
+            "stats": cmd_stats, "db": cmd_db}
 
 if __name__ == "__main__":
     if len(sys.argv) < 2 or sys.argv[1] in ("-h", "--help", "help") or sys.argv[1] not in COMMANDS:
