@@ -1,0 +1,10 @@
+studio.db
+studio.db-journal
+__pycache__/
+*.pyc
+.venv/
+.DS_Store
+inbox/*.png
+inbox/*.jpg
+inbox/*.jpeg
+inbox/*.mp4

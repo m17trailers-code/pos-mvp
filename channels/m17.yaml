@@ -1,0 +1,55 @@
+# M17 channel config. Edit freely; agents read this every run.
+channel:
+  name: M17
+  handle: "@m17515588"
+  platform: tiktok
+  language: en
+  niche: ai-generated horror / found footage
+  timezone: America/New_York        # confirm in /intake
+
+status:
+  followers: 3400                   # update after /ingest-analytics
+  views_last_30d: 3000000
+  flag_history:
+    - "coordinated or automated behavior (date unknown) — behave 100% human"
+  tiktok_shop_affiliate: under_appeal
+
+goals:
+  - id: creator_rewards
+    priority: 1
+    target: 10000 followers, 100k views/30d, videos >= 60s (we use 65s floor)
+  - id: shop_affiliate
+    priority: 2
+    target: approval on appeal, then horror-fit products with disclosure
+  - id: brand_deals
+    priority: 3
+    target: media kit once creator_rewards is on
+
+formats:                            # proven recipes live in knowledge/formats.md
+  - found_footage
+  - jump_scare
+  - creepy_pov
+  - whats_in_the_room
+
+lengths:
+  short: [20, 40]
+  mid: [40, 60]
+  long: [65, 90]
+  min_long_per_day: 1
+
+posting:
+  cadence_per_day: 1                # confirm in /intake
+  windows_local:                    # placeholders until /intake + analytics
+    - "19:00-22:00"
+    - "12:00-13:00"
+  best_days: []                     # filled by /scorecard
+
+production:
+  tool: higgsfield
+  aspect: "9:16"
+  resolution: "1080x1920"
+  scare_beat_window: [0.55, 0.75]   # fraction of runtime
+
+limits:
+  shoppable_videos_per_day: 3       # pilot-program cap; see knowledge/platform-rules.md
+  shoppable_lives_per_week: 3
